@@ -42,7 +42,7 @@ export default function PublicFormPage() {
   const [error, setError] = useState("");
   const [direction, setDirection] = useState<"next" | "prev">("next");
   const [rating, setRating] = useState<Record<string, number>>({});
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   // ===== Persistence for Reloads =====
   useEffect(() => {
@@ -299,9 +299,12 @@ export default function PublicFormPage() {
   // ===== Question Screen =====
   const q = currentQuestion;
   if (!q) {
-    // If somehow currentIndex is out of bounds, reset it
-    setTimeout(() => setCurrentIndex(-1), 0);
-    return null;
+    // If somehow currentIndex is out of bounds, show welcome screen
+    return (
+      <div className={styles.loadingPage}>
+        <div className={styles.spinner} />
+      </div>
+    );
   }
   const qId = String(q.id);
 
@@ -332,7 +335,7 @@ export default function PublicFormPage() {
           <div className={styles.inputArea}>
             {q.type === "short_text" && (
               <input
-                ref={inputRef as React.RefObject<HTMLInputElement>}
+                ref={inputRef as React.RefObject<HTMLInputElement | null>}
                 className={styles.textInput}
                 placeholder="Type your answer here..."
                 value={answers[qId] || ""}
@@ -343,7 +346,7 @@ export default function PublicFormPage() {
 
             {q.type === "long_text" && (
               <textarea
-                ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+                ref={inputRef as React.RefObject<HTMLTextAreaElement | null>}
                 className={styles.textareaInput}
                 placeholder="Type your answer here..."
                 value={answers[qId] || ""}
@@ -355,7 +358,7 @@ export default function PublicFormPage() {
 
             {q.type === "email" && (
               <input
-                ref={inputRef as React.RefObject<HTMLInputElement>}
+                ref={inputRef as React.RefObject<HTMLInputElement | null>}
                 className={styles.textInput}
                 type="email"
                 placeholder="name@example.com"
@@ -367,7 +370,7 @@ export default function PublicFormPage() {
 
             {q.type === "number" && (
               <input
-                ref={inputRef as React.RefObject<HTMLInputElement>}
+                ref={inputRef as React.RefObject<HTMLInputElement | null>}
                 className={styles.textInput}
                 type="number"
                 placeholder="Type a number..."
