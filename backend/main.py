@@ -250,8 +250,44 @@ def save_form(form_id: int, req: SaveFormRequest, user: dict = Depends(get_curre
         )
 
     conn.commit()
+
+    # Return full form data so the frontend stays in sync
+    cursor.execute("SELECT * FROM forms WHERE id = %s", (form_id,))
+    form = cursor.fetchone()
+
+    cursor.execute(
+        "SELECT * FROM questions WHERE form_id = %s ORDER BY position ASC",
+        (form_id,),
+    )
+    questions_raw = cursor.fetchall()
     conn.close()
-    return {"status": "saved"}
+
+    questions = []
+    for q in questions_raw:
+        options = []
+        if q["options"]:
+            try:
+                options = json.loads(q["options"])
+            except json.JSONDecodeError:
+                options = []
+        questions.append({
+            "id": str(q["id"]),
+            "type": q["question_type"],
+            "title": q["title"],
+            "description": q["description"] or "",
+            "required": bool(q["is_required"]),
+            "options": options,
+            "position": q["position"],
+        })
+
+    return {
+        "id": form["id"],
+        "title": form["title"],
+        "description": form["description"] or "",
+        "is_published": bool(form["is_published"]),
+        "share_slug": form["share_slug"],
+        "questions": questions,
+    }
 
 
 @app.delete("/api/forms/{form_id}")
