@@ -351,6 +351,12 @@ def toggle_publish(form_id: int, user: dict = Depends(get_current_user)):
     return {"is_published": bool(new_status)}
 
 
+@app.get("/")
+def read_root():
+    """Root endpoint to prevent 404s on basic pings."""
+    return {"status": "ok", "message": "Typeform Clone API is running"}
+
+
 @app.get("/api/health")
 def health_check():
     """Health check endpoint."""
