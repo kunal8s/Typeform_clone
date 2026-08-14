@@ -26,13 +26,14 @@ export default function BuilderPage() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
+  const API = process.env.NEXT_PUBLIC_API_URL || "";
   const getToken = () => localStorage.getItem("token");
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
   // ===== Load Form =====
   const fetchForm = useCallback(async () => {
     try {
-      const res = await fetch(`/api/forms/${formId}`, {
+      const res = await fetch(`${API}/api/forms/${formId}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) { router.push("/dashboard"); return; }
@@ -175,7 +176,7 @@ export default function BuilderPage() {
           required: q.required, options: q.options, position: i,
         })),
       };
-      const res = await fetch(`/api/forms/${formId}`, {
+      const res = await fetch(`${API}/api/forms/${formId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(body),
@@ -203,7 +204,7 @@ export default function BuilderPage() {
     }
 
     try {
-      const res = await fetch(`/api/forms/${formId}/publish`, {
+      const res = await fetch(`${API}/api/forms/${formId}/publish`, {
         method: "PUT", headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (res.ok) {

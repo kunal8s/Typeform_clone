@@ -26,7 +26,7 @@ interface PublicForm {
   questions: PublicQuestion[];
 }
 
-const API = "";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function PublicFormPage() {
   const params = useParams();

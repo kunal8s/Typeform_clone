@@ -14,7 +14,7 @@ interface FormItem {
   share_slug: string;
 }
 
-const API = "";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function DashboardPage() {
   const router = useRouter();
