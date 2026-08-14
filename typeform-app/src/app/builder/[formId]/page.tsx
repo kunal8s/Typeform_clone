@@ -194,6 +194,14 @@ export default function BuilderPage() {
   // ===== Publish =====
   const togglePublish = async () => {
     await saveForm();
+    
+    // If it's already published, just act as a "Publish Changes" and redirect
+    if (form?.is_published) {
+      showToast("Changes published! 🚀 Redirecting...");
+      setTimeout(() => router.push("/dashboard"), 1500);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/forms/${formId}/publish`, {
         method: "PUT", headers: { Authorization: `Bearer ${getToken()}` },
