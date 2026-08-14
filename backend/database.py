@@ -1,20 +1,18 @@
 """
-Database module — SQLite connection, schema initialization, and seed data.
+Database module — PostgreSQL connection, schema initialization, and seed data.
 """
-import sqlite3
 import os
 import json
 import uuid
+import psycopg
+from psycopg.rows import dict_row
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "typeform.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/typeform")
 
 
-def get_connection() -> sqlite3.Connection:
-    """Create and return a database connection with row factory."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+def get_connection():
+    """Create and return a database connection with dict row factory."""
+    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
     return conn
 
 
@@ -23,10 +21,10 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.executescript("""
+    cursor.execute("""
         -- Users table
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -35,7 +33,7 @@ def init_db():
 
         -- Forms table
         CREATE TABLE IF NOT EXISTS forms (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             title TEXT NOT NULL DEFAULT 'Untitled Form',
             description TEXT,
@@ -48,7 +46,7 @@ def init_db():
 
         -- Questions table
         CREATE TABLE IF NOT EXISTS questions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             form_id INTEGER NOT NULL,
             question_type TEXT NOT NULL,
             title TEXT NOT NULL,
@@ -62,7 +60,7 @@ def init_db():
 
         -- Responses table
         CREATE TABLE IF NOT EXISTS responses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             form_id INTEGER NOT NULL,
             respondent_id TEXT,  -- anonymous UUID
             submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -71,7 +69,7 @@ def init_db():
 
         -- Answers table
         CREATE TABLE IF NOT EXISTS answers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             response_id INTEGER NOT NULL,
             question_id INTEGER NOT NULL,
             value TEXT,
@@ -82,5 +80,3 @@ def init_db():
 
     conn.commit()
     conn.close()
-
-

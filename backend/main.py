@@ -100,18 +100,18 @@ def signup(req: SignupRequest):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email = ?", (req.email,))
+    cursor.execute("SELECT id FROM users WHERE email = %s", (req.email,))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
     password_hash = hash_password(req.password)
     cursor.execute(
-        "INSERT INTO users (email, password_hash) VALUES (?, ?)",
+        "INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING id",
         (req.email, password_hash),
     )
+    user_id = cursor.fetchone()["id"]
     conn.commit()
-    user_id = cursor.lastrowid
     conn.close()
 
     token = create_access_token({"sub": str(user_id), "email": req.email})
@@ -124,7 +124,7 @@ def login(req: LoginRequest):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, email, password_hash FROM users WHERE email = ?", (req.email,))
+    cursor.execute("SELECT id, email, password_hash FROM users WHERE email = %s", (req.email,))
     user = cursor.fetchone()
     conn.close()
 
@@ -150,7 +150,7 @@ def list_forms(user: dict = Depends(get_current_user)):
                (SELECT COUNT(*) FROM responses r WHERE r.form_id = f.id) AS response_count
         FROM forms f
         LEFT JOIN questions q ON q.form_id = f.id
-        WHERE f.user_id = ?
+        WHERE f.user_id = %s
         GROUP BY f.id
         ORDER BY f.updated_at DESC
     """, (user["id"],))
@@ -166,11 +166,11 @@ def create_form(req: CreateFormRequest, user: dict = Depends(get_current_user)):
     cursor = conn.cursor()
     share_slug = str(uuid.uuid4())[:8]
     cursor.execute(
-        "INSERT INTO forms (user_id, title, share_slug) VALUES (?, ?, ?)",
+        "INSERT INTO forms (user_id, title, share_slug) VALUES (%s, %s, %s) RETURNING id",
         (user["id"], req.title, share_slug),
     )
+    form_id = cursor.fetchone()["id"]
     conn.commit()
-    form_id = cursor.lastrowid
     conn.close()
     return {"id": form_id, "title": req.title, "share_slug": share_slug}
 
@@ -181,14 +181,14 @@ def get_form(form_id: int, user: dict = Depends(get_current_user)):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM forms WHERE id = ? AND user_id = ?", (form_id, user["id"]))
+    cursor.execute("SELECT * FROM forms WHERE id = %s AND user_id = %s", (form_id, user["id"]))
     form = cursor.fetchone()
     if not form:
         conn.close()
         raise HTTPException(status_code=404, detail="Form not found")
 
     cursor.execute(
-        "SELECT * FROM questions WHERE form_id = ? ORDER BY position ASC",
+        "SELECT * FROM questions WHERE form_id = %s ORDER BY position ASC",
         (form_id,),
     )
     questions_raw = cursor.fetchall()
@@ -228,24 +228,24 @@ def save_form(form_id: int, req: SaveFormRequest, user: dict = Depends(get_curre
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM forms WHERE id = ? AND user_id = ?", (form_id, user["id"]))
+    cursor.execute("SELECT id FROM forms WHERE id = %s AND user_id = %s", (form_id, user["id"]))
     if not cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Form not found")
 
     # Update form metadata
     cursor.execute(
-        "UPDATE forms SET title = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE forms SET title = %s, description = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
         (req.title, req.description, form_id),
     )
 
     # Delete existing questions and re-insert
-    cursor.execute("DELETE FROM questions WHERE form_id = ?", (form_id,))
+    cursor.execute("DELETE FROM questions WHERE form_id = %s", (form_id,))
     for i, q in enumerate(req.questions):
         options_json = json.dumps(q.options) if q.options else None
         cursor.execute(
             """INSERT INTO questions (form_id, question_type, title, description, is_required, position, options)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
             (form_id, q.type, q.title, q.description, int(q.required), i, options_json),
         )
 
@@ -260,12 +260,12 @@ def delete_form(form_id: int, user: dict = Depends(get_current_user)):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM forms WHERE id = ? AND user_id = ?", (form_id, user["id"]))
+    cursor.execute("SELECT id FROM forms WHERE id = %s AND user_id = %s", (form_id, user["id"]))
     if not cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Form not found")
 
-    cursor.execute("DELETE FROM forms WHERE id = ?", (form_id,))
+    cursor.execute("DELETE FROM forms WHERE id = %s", (form_id,))
     conn.commit()
     conn.close()
     return {"status": "deleted"}
@@ -277,13 +277,13 @@ def rename_form(form_id: int, req: RenameFormRequest, user: dict = Depends(get_c
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM forms WHERE id = ? AND user_id = ?", (form_id, user["id"]))
+    cursor.execute("SELECT id FROM forms WHERE id = %s AND user_id = %s", (form_id, user["id"]))
     if not cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Form not found")
 
     cursor.execute(
-        "UPDATE forms SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE forms SET title = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
         (req.title, form_id),
     )
     conn.commit()
@@ -297,7 +297,7 @@ def duplicate_form(form_id: int, user: dict = Depends(get_current_user)):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT title, description FROM forms WHERE id = ? AND user_id = ?", (form_id, user["id"]))
+    cursor.execute("SELECT title, description FROM forms WHERE id = %s AND user_id = %s", (form_id, user["id"]))
     form = cursor.fetchone()
     if not form:
         conn.close()
@@ -308,19 +308,19 @@ def duplicate_form(form_id: int, user: dict = Depends(get_current_user)):
 
     # Insert new form
     cursor.execute(
-        "INSERT INTO forms (user_id, title, description, share_slug) VALUES (?, ?, ?, ?)",
+        "INSERT INTO forms (user_id, title, description, share_slug) VALUES (%s, %s, %s, %s) RETURNING id",
         (user["id"], new_title, form["description"], share_slug),
     )
-    new_form_id = cursor.lastrowid
+    new_form_id = cursor.fetchone()["id"]
 
     # Get questions
-    cursor.execute("SELECT question_type, title, description, is_required, position, options FROM questions WHERE form_id = ?", (form_id,))
+    cursor.execute("SELECT question_type, title, description, is_required, position, options FROM questions WHERE form_id = %s", (form_id,))
     questions = cursor.fetchall()
 
     for q in questions:
         cursor.execute(
             """INSERT INTO questions (form_id, question_type, title, description, is_required, position, options)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
             (new_form_id, q["question_type"], q["title"], q["description"], q["is_required"], q["position"], q["options"])
         )
 
@@ -335,7 +335,7 @@ def toggle_publish(form_id: int, user: dict = Depends(get_current_user)):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, is_published FROM forms WHERE id = ? AND user_id = ?", (form_id, user["id"]))
+    cursor.execute("SELECT id, is_published FROM forms WHERE id = %s AND user_id = %s", (form_id, user["id"]))
     form = cursor.fetchone()
     if not form:
         conn.close()
@@ -343,7 +343,7 @@ def toggle_publish(form_id: int, user: dict = Depends(get_current_user)):
 
     new_status = 0 if form["is_published"] else 1
     cursor.execute(
-        "UPDATE forms SET is_published = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE forms SET is_published = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
         (new_status, form_id),
     )
     conn.commit()
@@ -364,13 +364,13 @@ def get_public_form(share_slug: str):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM forms WHERE share_slug = ? AND is_published = 1", (share_slug,))
+    cursor.execute("SELECT * FROM forms WHERE share_slug = %s AND is_published = 1", (share_slug,))
     form = cursor.fetchone()
     if not form:
         conn.close()
         raise HTTPException(status_code=404, detail="Form not found or not published")
 
-    cursor.execute("SELECT * FROM questions WHERE form_id = ? ORDER BY position ASC", (form["id"],))
+    cursor.execute("SELECT * FROM questions WHERE form_id = %s ORDER BY position ASC", (form["id"],))
     questions_raw = cursor.fetchall()
     conn.close()
 
@@ -407,7 +407,7 @@ def submit_response(share_slug: str, req: SubmitResponseRequest):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM forms WHERE share_slug = ? AND is_published = 1", (share_slug,))
+    cursor.execute("SELECT id FROM forms WHERE share_slug = %s AND is_published = 1", (share_slug,))
     form = cursor.fetchone()
     if not form:
         conn.close()
@@ -416,7 +416,7 @@ def submit_response(share_slug: str, req: SubmitResponseRequest):
     form_id = form["id"]
 
     # Fetch questions for validation
-    cursor.execute("SELECT id, question_type, is_required FROM questions WHERE form_id = ? ORDER BY position ASC", (form_id,))
+    cursor.execute("SELECT id, question_type, is_required FROM questions WHERE form_id = %s ORDER BY position ASC", (form_id,))
     questions = cursor.fetchall()
 
     # Server-side validation
@@ -451,16 +451,16 @@ def submit_response(share_slug: str, req: SubmitResponseRequest):
     respondent_id = str(uuid.uuid4())
 
     cursor.execute(
-        "INSERT INTO responses (form_id, respondent_id) VALUES (?, ?)",
+        "INSERT INTO responses (form_id, respondent_id) VALUES (%s, %s) RETURNING id",
         (form_id, respondent_id)
     )
-    response_id = cursor.lastrowid
+    response_id = cursor.fetchone()["id"]
 
     # Insert answers
     for q_id_str, value in req.answers.items():
         if value is not None and value != "":
             cursor.execute(
-                "INSERT INTO answers (response_id, question_id, value) VALUES (?, ?, ?)",
+                "INSERT INTO answers (response_id, question_id, value) VALUES (%s, %s, %s)",
                 (response_id, int(q_id_str), value)
             )
 
@@ -477,13 +477,13 @@ def get_form_responses(form_id: int, user: dict = Depends(get_current_user)):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, title FROM forms WHERE id = ? AND user_id = ?", (form_id, user["id"]))
+    cursor.execute("SELECT id, title FROM forms WHERE id = %s AND user_id = %s", (form_id, user["id"]))
     form = cursor.fetchone()
     if not form:
         conn.close()
         raise HTTPException(status_code=404, detail="Form not found")
 
-    cursor.execute("SELECT id, question_type, title, options FROM questions WHERE form_id = ? ORDER BY position ASC", (form_id,))
+    cursor.execute("SELECT id, question_type, title, options FROM questions WHERE form_id = %s ORDER BY position ASC", (form_id,))
     questions_raw = cursor.fetchall()
 
     questions = []
@@ -501,12 +501,12 @@ def get_form_responses(form_id: int, user: dict = Depends(get_current_user)):
             "options": options,
         })
 
-    cursor.execute("SELECT id, respondent_id, submitted_at FROM responses WHERE form_id = ? ORDER BY submitted_at DESC", (form_id,))
+    cursor.execute("SELECT id, respondent_id, submitted_at FROM responses WHERE form_id = %s ORDER BY submitted_at DESC", (form_id,))
     responses_raw = cursor.fetchall()
 
     responses = []
     for r in responses_raw:
-        cursor.execute("SELECT question_id, value FROM answers WHERE response_id = ?", (r["id"],))
+        cursor.execute("SELECT question_id, value FROM answers WHERE response_id = %s", (r["id"],))
         answers_raw = cursor.fetchall()
         answers_dict = {str(a["question_id"]): a["value"] for a in answers_raw}
         
