@@ -159,6 +159,7 @@ export default function PublicFormPage() {
   };
 
   const startForm = () => {
+    if (totalQuestions === 0) return;
     setDirection("next");
     setCurrentIndex(0);
   };
@@ -296,7 +297,12 @@ export default function PublicFormPage() {
   }
 
   // ===== Question Screen =====
-  const q = currentQuestion!;
+  const q = currentQuestion;
+  if (!q) {
+    // If somehow currentIndex is out of bounds, reset it
+    setTimeout(() => setCurrentIndex(-1), 0);
+    return null;
+  }
   const qId = String(q.id);
 
   return (
@@ -388,6 +394,8 @@ export default function PublicFormPage() {
                             setDirection("next");
                             if (!isLastQuestion) {
                               setCurrentIndex((i) => i + 1);
+                            } else {
+                              handleSubmit();
                             }
                           }
                         }, 400);
@@ -437,6 +445,8 @@ export default function PublicFormPage() {
                             setDirection("next");
                             if (!isLastQuestion) {
                               setCurrentIndex((i) => i + 1);
+                            } else {
+                              handleSubmit();
                             }
                           }
                         }, 400);

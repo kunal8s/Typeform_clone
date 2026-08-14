@@ -201,7 +201,10 @@ export default function BuilderPage() {
       if (res.ok) {
         const data = await res.json();
         setForm((prev) => prev ? { ...prev, is_published: data.is_published, share_slug: data.share_slug } : prev);
-        showToast(data.is_published ? "Published! 🚀" : "Unpublished");
+        showToast(data.is_published ? "Published! 🚀 Redirecting..." : "Unpublished");
+        if (data.is_published) {
+          setTimeout(() => router.push("/dashboard"), 1500);
+        }
       }
     } catch { showToast("Publish failed"); }
   };
